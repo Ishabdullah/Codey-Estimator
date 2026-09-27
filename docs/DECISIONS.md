@@ -99,6 +99,76 @@ questions. Answered as follows; binding for the Implementer:
   functions (not a wrapper class) is accepted, matching the INTEGER-cents DB
   columns Phase 3 will create.
 
+## Addendum: Phase 4b architect spec — `ports.py` + `refresh.py` open questions resolved (2026-09-27)
+
+The Architect agent's Phase 4b spec (repository Protocols + refresh policy,
+token bucket, daily budget, backoff, circuit breaker) raised 9 open questions.
+Resolved by the orchestrator per this repo's own governance (none of these
+touch a real tax/RBAC/schema decision only the user can make — they're
+implementation-technique choices within already-decided architecture); binding
+for the Implementer:
+
+- **Q1 (blocking — purity test vs. `datetime`/`time.monotonic`):** Resolved in
+  favor of keeping `test_purity.py`'s forbidden-imports list exactly as-is.
+  `refresh.py` uses `EpochSeconds = int` (UTC Unix seconds) throughout, and
+  every clock read goes through a **required** `now_fn: Clock` parameter — no
+  default, no wall-clock import inside the library. This matches the existing
+  determinism rule the calc engine already follows. Codey-OS converts its
+  SQLite `TEXT` timestamps to epoch seconds at the repository boundary, not
+  inside this library. `refresh.py` is a single module, not a `refresh/`
+  package, for this task's actual scope — split it later only if it grows
+  enough to need it.
+- **Q2 (retailer/store identity):** Confirmed — `retailer_code: str` and
+  `store_code: str` in the ports, never the Core DB's integer ids. Codey-OS
+  maps codes/store-codes to its own `retailer_id`/`retailer_stores.id` at the
+  repository implementation layer. Matches D1's library/Core boundary exactly.
+- **Q3 (config defaults / "high value" basis):** Approved as **library
+  defaults only, fully overridable** — not a business decision on real pricing
+  policy: `frequent_min_uses=5`, `high_value_threshold_cents=10_000`
+  ($100.00/package), `high_value_interval_days=60`, volatile categories
+  `copper`/`lumber`/`sheet_goods` at 30 days. **"High value" compares the
+  package price** (`current_price_cents`), not a computed per-unit-of-measure
+  price. Codey-OS supplies real production numbers when Phase 5 (Price Book)
+  is built; revisit then, not now.
+  - **Naming correction (orchestrator, not the architect's call to make
+    unreviewed):** the spec's `RefreshSubject` field named `unit_price_cents`
+    is documented as "per package," which collides with
+    `PriceObservationData.unit_price_cents` elsewhere in the *same* spec — a
+    genuinely different thing (a computed per-unit-of-measure price for
+    cross-package comparison, e.g. $/sq ft). Two dataclasses in one module
+    using the same field name for two different concepts is exactly the kind
+    of DTO ambiguity this repo's own rules (customer-view allow-list
+    discipline) exist to catch before it ships. **The Implementer renames
+    `RefreshSubject`'s field to `package_price_cents`** throughout the spec's
+    examples/tests; no other change. The `price_book_items.use_count`
+    (lifetime) vs. `uses_in_window` (90-day) mismatch the spec flagged is
+    correctly deferred — it's a Phase 3/5 schema question, not a Phase 4b one.
+- **Q4 (search-cache max age):** Confirmed — a required parameter, no library
+  default. Codey-OS picks the actual freshness window when Phase 4c/6 wires up
+  remote search.
+- **Q5 (daily budget: calendar day, fixed UTC offset, no persistence):**
+  Approved as specified, including the known limitation that a fixed offset
+  drifts about an hour across Connecticut's two annual DST transitions — this
+  is a soft API-spend cap, not a safety-critical boundary, so the drift is an
+  accepted limitation, not a defect. No `BudgetRepo` Protocol in this task;
+  whether/how Codey-OS persists `BudgetState` across a process restart is a
+  Phase 10 (refresh queue & worker) decision, not this one.
+- **Q6 (no jitter in backoff):** Confirmed — single-worker-thread system, no
+  thundering-herd concern, and randomness is already forbidden in this
+  library. The caller isn't given a jitter hook.
+- **Q7 (`RetailerProductRepo.update_refresh_state` added beyond the four
+  originally-asked methods):** Approved — keep it. Without it, the
+  check-then-reschedule refresh loop can't be expressed through the port at
+  all, which would just force Codey-OS to reach around the interface.
+- **Q8 (`FAILED`/`PENDING` → `is_due() == False`):** Confirmed — matches plan
+  §12's model where a failed product needs an admin reset or a manual
+  "Refresh Price" action before it's retried automatically, rather than being
+  silently retried by the policy itself.
+- **Q9 (circuit breaker scope: generic, one per retailer, in-memory only):**
+  Confirmed. Per-product `consecutive_failures` feeding
+  `retailer_products.refresh_status='failed'` is Codey-OS worker logic
+  (Phase 10), explicitly out of scope for this library task.
+
 ## Outstanding (not decisions, but still needed before later phases)
 
 - The §21 read-only DB check command output (live `estimates`/`documents`/FTS5
