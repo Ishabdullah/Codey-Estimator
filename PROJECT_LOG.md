@@ -2,6 +2,65 @@
 
 Reverse-chronological. Every change gets an entry.
 
+## 2026-09-27 — Phase 2: codey_estimator library foundation, built through the pipeline
+
+**What was done**
+- Ran the full pipeline end to end for the first time: Architect (opus) → Implementer
+  (sonnet) → Code Reviewer (sonnet) → fixup Implementer pass → Verifier (haiku).
+  All roles driven this session via `general-purpose` + model override, since
+  custom `.claude/agents/*.md` types register on a fresh session scan, not
+  mid-session — confirmed by a failed `estimator-architect` dispatch attempt.
+- Architect produced the full Phase 2 spec (money/units/calc/dto) with exact
+  formulas, worked examples (A/B/B2/B3/C/D), and 11 open questions — resolved
+  with the user and recorded as two addenda in `docs/DECISIONS.md`.
+- Implementer built `src/codey_estimator/` (`money.py`, `units.py`, `errors.py`,
+  `dto.py`, `calc/engine.py`) plus 9 test files and
+  `.github/workflows/test.yml`, all stdlib-only. Reported 3 deliberate spec
+  deviations (documented in the commit history and DECISIONS.md).
+- Code Reviewer found 3 low-severity findings (no money bugs): an error-code
+  collision between the genuine `LINE_TYPE_MISMATCH` case and the allowance/fee
+  "needs override" case, a purity-test coverage gap (`dto.py` wasn't scanned for
+  float literals), and a missing negative test for the `FIXED_PER_UNIT`+`HR`
+  validation branch.
+- Fixup Implementer pass addressed all 3: new `ALLOWANCE_FEE_REQUIRES_OVERRIDE`
+  error code, extended the purity scan to `dto.py`, added the missing test.
+- Verifier independently re-ran the suite from a clean install: **64/64
+  passing**, exit code 0, no skips/xfails. Confirmed the three fixup tests by
+  name.
+- Branch strategy changed at the user's request: created `main` (the repo had
+  none before — `claude/epic-archimedes-z3luuu` was the only branch and
+  GitHub's default), and all commits from this point go straight to `main`, no
+  PR review checkpoint. This is the user's explicit choice for a solo project;
+  logged so future sessions don't wonder why there's no PR history.
+- Added `.gitignore` (build artifacts: `__pycache__/`, `*.egg-info/`, etc.)
+
+**Commits:** `f8a7101` (decisions + pipeline), `db97cac` (spec Q&A), `8fb989b`
+(Phase 2 initial implementation), `895770d` (code-review fixups).
+
+**Areas of concern (tracked)**
+- **No lint/type-checker configured.** The Verifier confirmed there's no
+  `mypy`/`ruff`/similar in `pyproject.toml`, no Makefile, and CI only runs
+  `pytest`. Worth adding before the codebase grows past Phase 2 — flagged for
+  the user's decision, not added unilaterally.
+- D2 scraper risk (see prior entry) still stands, still Phase 11/12, not
+  touched this phase.
+- CT sales-tax method (D6) still needs accountant confirmation before it
+  governs real customer tax calculations — Phase 2's materials-only default is
+  a test-case choice, not a tax filing.
+- Live DB read-only check (§21) still not run — needed before Phase 3
+  (schema/migrations), not before Phase 2.
+
+**Not done (by design)**
+- No catalog/, retailers/, ports.py, DB repositories, or any I/O — out of
+  scope for Phase 2 per the architect's spec.
+- Codey-OS `NEW_ISSUES.md` still doesn't have F1–F6 logged (still read-only
+  Codey-OS access this session).
+
+**Next:** Phase 3 (schema & migrations in Codey-OS) is blocked on push access
+to Codey-OS and the §21 live-DB check. Until then, Phase 4-adjacent library
+work (catalog/normalizer, ManualAdapter, CsvImportAdapter — all still
+Codey-Estimator-only, no DB) can proceed through the same pipeline.
+
 ## 2026-09-27 — Phase 1: decisions answered, agent pipeline created
 
 **What was done**
