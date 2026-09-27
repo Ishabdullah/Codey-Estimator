@@ -281,8 +281,22 @@ Answered 2026-09-27:
 
 ## Outstanding (not decisions, but still needed before later phases)
 
-- The §21 read-only DB check command output (live `estimates`/`documents`/FTS5
-  check) — needed before Phase 3 schema work, not before Phase 2 library work.
+- ~~The §21 read-only DB check command output~~ — **RESOLVED 2026-09-27.**
+  User ran the read-only check on the live phone DB
+  (`~/.codeyOS/restoricon.db`). Result: the `estimates` table is completely
+  empty (zero rows — the status-group-by returned no rows at all), so there
+  are zero line items, zero linked `documents`, zero linked `contracts`, and
+  zero `audit_log` create-rows for estimates to migrate. `FTS5: available`
+  (SQLite 3.53.4). **This significantly simplifies Phase 3**: there is no
+  legacy estimate data to migrate, no backfill logic needed for
+  `created_by_user_id` from audit history, and no risk of data loss from the
+  `estimates` table rebuild (widening the status CHECK / changing the
+  customer FK from `ON DELETE CASCADE`) plan §14.1/§21 describe — an empty
+  table rebuild is a much lower-risk operation than the "no data loss on a
+  live table with real rows" scenario the migration strategy was written
+  for. Phase 3 can build the target schema more directly; the migration
+  section (plan §21) can be simplified accordingly when Phase 3 is scoped
+  in Codey-OS.
 - Accountant confirmation of D6's materials-only tax treatment for CT
   real-property contractor work, before this governs a real customer-facing tax
   calculation.
