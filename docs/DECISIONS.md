@@ -169,6 +169,63 @@ for the Implementer:
   `retailer_products.refresh_status='failed'` is Codey-OS worker logic
   (Phase 10), explicitly out of scope for this library task.
 
+## Addendum: Phase 4a architect spec — `catalog` (normalizer/matcher) decisions (2026-09-27)
+
+The Architect agent's Phase 4a spec (product normalizer, canonical key,
+matcher) raised 7 open questions and explicitly flagged 4 of them (Q1, Q2, Q3,
+Q6 in its own numbering) as touching schema or money — genuine business/data
+judgment calls, not implementation technique, so they went to the user rather
+than being decided by the orchestrator. Answered 2026-09-27:
+
+- **UPC/model identity vs. a conflicting required attribute:** **flag for
+  human review, never auto-discard or auto-merge.** When a candidate's
+  barcode or model number matches a canonical material the system already
+  tracks, but a required attribute (e.g. pipe size) conflicts with the stored
+  record, the match keeps its full confidence (a barcode match is strong
+  evidence) but its **status drops to `PROPOSED`, never `AUTO_CONFIRMED`** —
+  a person confirms or rejects it. This is the architect's recommended
+  default (spec §8.1, tests M11/M12) and matches plan §11.6's own principle
+  ("where matching is uncertain, preserve the separate retailer products")
+  applied to the identity-plus-conflict case specifically: the data is
+  contradictory, which is a review case, not an auto-decision either way.
+- **Confidence as integer basis points (0–10000), not a float:** approved —
+  consistent with D3 and this library's existing basis-point convention
+  (markup_bp, tax_rate_bp, etc. in the calc engine). Not a new decision, just
+  applying an already-decided convention.
+- **Default subtype when a listing's title is silent** (e.g. no "Type X" /
+  "pressure-treated" in the text): **assume the plain/standard version**
+  (drywall → `REGULAR`, lumber → `UNTREATED`). Approved because the risk is
+  well-contained by the matcher's own design: a wrong default only ever caps
+  a match at `PROPOSED` (needs human confirmation) — it never lets a
+  mis-guessed subtype silently `AUTO_CONFIRM` into a real estimate.
+- **Matcher weights and thresholds:** approved as proposed — `REQUIRED=10`,
+  `SUBTYPE=6`, other `OPTIONAL=3`, `INFO=0`; `AUTO_CONFIRM >= 9000 bp`,
+  `PROPOSED >= 6000 bp`, else `NO_MATCH`. These are **library defaults, not
+  binding production tuning** — same posture as the Phase 4b `RefreshPolicyConfig`
+  defaults. Revisit with real cross-retailer listing data once Phase 4a/13
+  actually runs against retailer products, not before.
+- **Canonical key format** (adds a category prefix and includes `SUBTYPE`,
+  vs. the architecture plan's own illustrative example): **pending — the
+  user asked to see the exact format with real examples before approving.**
+  Given directly in the same conversation turn as this addendum (see
+  `PROJECT_LOG.md`/chat for the worked table). Do not implement `keys.py`
+  until this line is updated to "approved."
+- **Package-inference provenance (Q6):** approved as scoped — `infer_package`
+  itself assigns no provenance; whether a package size counts as
+  `RETAILER_LISTING` or `MANUAL_ENTRY` is decided by the adapter/caller, per
+  the existing Q8 addendum (adapters must source `package_qty`/`package_unit`
+  from the actual retailer listing; free-typed sizes are manual-entry only).
+  The specific unit choices (drywall in SF, lumber in EA not LF, paint in
+  QT/GAL kept to whole quart/gallon amounts, fasteners with no count
+  returning `None` rather than guessing a weight-based unit) are approved as
+  sound, ordinary construction-estimating conventions.
+- **Minor documented limitations, not decisions (Q7):** lumber length with no
+  unit uses a `<=24 -> feet, else inches` heuristic; dimensions written only
+  in inches (`48 in. x 96 in.`) aren't parsed; nail sizes other than
+  penny/`Nd` aren't parsed. Accepted as v1 gaps, logged for a future
+  follow-up alongside the deferred ~100-real-title normalizer corpus (plan
+  §26) and the fittings category — not blocking this phase.
+
 ## Outstanding (not decisions, but still needed before later phases)
 
 - The §21 read-only DB check command output (live `estimates`/`documents`/FTS5
