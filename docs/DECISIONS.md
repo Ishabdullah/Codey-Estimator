@@ -232,6 +232,53 @@ than being decided by the orchestrator. Answered 2026-09-27:
   follow-up alongside the deferred ~100-real-title normalizer corpus (plan
   §26) and the fittings category — not blocking this phase.
 
+## Addendum: Phase 4c architect spec — `retailers` (adapter interface, Manual/CSV) decisions (2026-09-27)
+
+The Architect agent's Phase 4c spec (`RetailerAdapter` Protocol,
+`ManualAdapter`, `CsvImportAdapter`) raised 8 open questions, 3 of which
+(Q1–Q3 in its numbering) it explicitly flagged as touching money or schema.
+Answered 2026-09-27:
+
+- **CSV imports get their own retailer code, kept separate from a future
+  live price-checker for the same retailer** (e.g. `csv:homedepot` stays
+  distinct from a future `homedepot` adapter, never merged). Approved as
+  spec'd/recommended. Reasoning: a receipt's actual paid price and a live
+  shelf-price check are genuinely different things (Pro pricing, timing,
+  promotions); keeping them as separate `retailers` rows means "current
+  price = latest observation" (plan §8) never lets one silently overwrite
+  the other. The matcher, not the retailer identity, is what links them as
+  the same underlying material.
+- **A CSV row's price is dated to the actual purchase date** (the date
+  column), not to when the file is imported. Approved as spec'd/recommended.
+  Reasoning: an accurate price history — importing a 2-year-old receipt
+  must never make that old price look like today's price, and must never
+  override a genuinely recent price check just because it was imported more
+  recently.
+- **Real HD Pro Xtra / Lowe's exports have a per-item/per-package price
+  column** (confirmed by the user, not assumed) — the spec's built
+  `parse_price_cents` (parses a price column directly) matches reality.
+  The line-total÷quantity derivation the architect flagged as "not built,
+  needs a rounding rule" (its Q4) is **not needed** given this answer; drop
+  it from the outstanding list rather than carrying it forward.
+- The remaining architect questions were resolved by the orchestrator, not
+  escalated, since they're implementation technique within already-decided
+  rules, not new business policy: zero/negative CSV prices are rejected
+  outright (a return/credit/free-item is a different data class, never a
+  valid "price paid" observation); the manual-entry adapter derives a
+  stable synthetic SKU by hashing the cleaned title + package qty/unit
+  (with an explicit `retailer_sku` override always available) rather than
+  requiring Codey-OS to assign one; and CSV-parsed package sizes get
+  `RETAILER_LISTING` provenance (validated as `retailer_linked=True`, per
+  the existing Q8 rule), since a real retailer export describes an actual
+  package the retailer sold, not a free-typed estimate.
+  - **Noted, not blocking:** the architect flagged that a *hand-edited* CSV
+    could theoretically be used to smuggle a free-typed package size in
+    under `RETAILER_LISTING` provenance, defeating the Q8 rule's intent.
+    This is a process-control concern for whatever upload/import UI
+    Codey-OS eventually builds (e.g. requiring an unmodified retailer
+    export, or flagging manually-edited files for review), not something
+    this library task can or should solve — logged for that later phase.
+
 ## Outstanding (not decisions, but still needed before later phases)
 
 - The §21 read-only DB check command output (live `estimates`/`documents`/FTS5
