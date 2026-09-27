@@ -53,6 +53,52 @@ Raised by the user alongside D9; extends plan §13 (`labor_rates`) and §17 (adm
   admin/manager can see it); **editing** a labor rate (which inserts history)
   requires admin/manager, per the D9 revision above.
 
+## Addendum: Phase 2 architect spec — open questions resolved (2026-09-27)
+
+The Architect agent's Phase 2 spec (money/units/calc/dto) raised 11 open
+questions. Answered as follows; binding for the Implementer:
+
+- **Q1 (combined-line tax):** Under materials-only tax, a combined line (or an
+  override) is taxed only on its material share, pro-rated by
+  `net_sell × material_sell / components_sell`. Equipment/subcontractor
+  portions, and allowance/fee lines with no material, are never taxed.
+- **Q2 (tax rate precision):** Integer basis points is fine (CT's 6.35% = 635
+  bp is exact). Finer precision is a future change if a jurisdiction needs it.
+- **Q3 (discount tie-break):** Not re-asked — largest-remainder allocation
+  with ties going to the lower line index, as the architect proposed, stands.
+- **Q4/Q5 (fixed_flat labor):** The flat rate locks **both** cost and sell to
+  a single flat amount (quantity is stored for display only, never multiplied
+  into the flat amount's math). It still charges even at quantity 0. Bill rate
+  is mandatory on every labor line; there is no markup-on-cost fallback
+  anywhere (confirms D6b removes the plan §15 fallback entirely).
+- **Q6 (labor unit validation):** Not re-asked — HOURLY requires `labor_unit
+  == HR`; FIXED_PER_UNIT requires `labor_unit != HR`. Stands as spec'd.
+- **Q7 (customer view details):** Not re-asked — the customer view shows the
+  requested material quantity before waste (never the package count or waste
+  math), omits internal fields (section, tax rate, line-level discount
+  breakdown), and simply excludes hidden lines from the visible list (their
+  price still counts toward the displayed totals). Stands as spec'd.
+- **Q8 (package/quantity guard rails):** Package quantities and units must
+  always reflect **actual retailer packaging** (a real product's sold
+  quantity/unit — e.g. a 50 ft PEX roll, a 4×8 drywall sheet, a 1-gallon paint
+  can), never an invented or synthetic package size. This means `package_qty
+  >= 1` (whole real-world packages) is correct and stays as the Phase 2 guard;
+  fractional packages aren't a Phase 2 concern because Phase 2 has no retailer
+  data yet. **Carried forward to Phase 4 (catalog/pricing):** the product
+  normalizer and retailer adapters must always source `package_qty` /
+  `package_unit` from the retailer's actual listing, never let an estimator
+  type in an arbitrary package size by hand for a linked retailer product.
+  Manual-entry price-book items (no retailer link) are the one place a
+  free-typed package size is acceptable, since there's no retailer listing to
+  contradict.
+- **Q9 (allowance/fee lines):** The price-override mechanism (reason required,
+  audited) is fine for now; no dedicated flat-price field needed.
+- **Q10 (CI workflow):** Included in Phase 2 — `.github/workflows/test.yml`
+  (pytest on push) is part of this task, not a follow-up.
+- **Q11 (Money type):** Not re-asked — `Cents = int` type alias plus helper
+  functions (not a wrapper class) is accepted, matching the INTEGER-cents DB
+  columns Phase 3 will create.
+
 ## Outstanding (not decisions, but still needed before later phases)
 
 - The §21 read-only DB check command output (live `estimates`/`documents`/FTS5
