@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 
 from codey_estimator.calc import calculate
+from codey_estimator.calc.engine import calculate_line
 from codey_estimator.dto import (
     DiscountKind,
     EstimateDiscount,
@@ -137,6 +138,44 @@ def test_labor_unit_mismatch():
         calculate(_estimate([line]))
     assert exc.value.code == "LABOR_UNIT_MISMATCH"
     assert exc.value.line_key == "L1"
+
+
+def test_allowance_without_components_requires_override():
+    line = LineInput(
+        line_key="A1",
+        line_type=LineType.ALLOWANCE,
+        description="allowance",
+        customer_description="Allowance",
+    )
+    with pytest.raises(EstimateValidationError) as exc:
+        calculate_line(line)
+    assert exc.value.code == "ALLOWANCE_FEE_REQUIRES_OVERRIDE"
+    assert exc.value.line_key == "A1"
+
+    with pytest.raises(EstimateValidationError) as exc2:
+        calculate(_estimate([line]))
+    assert exc2.value.code == "ALLOWANCE_FEE_REQUIRES_OVERRIDE"
+    assert exc2.value.line_key == "A1"
+
+
+def test_fixed_per_unit_hr_unit_mismatch():
+    line = LineInput(
+        line_key="L2",
+        line_type=LineType.LABOR,
+        description="labor",
+        customer_description="Labor",
+        labor=LaborInput(
+            rate_type=LaborRateType.FIXED_PER_UNIT,
+            labor_qty=Decimal("1"),
+            labor_unit="HR",
+            labor_cost_rate_cents=100,
+            labor_bill_rate_cents=200,
+        ),
+    )
+    with pytest.raises(EstimateValidationError) as exc:
+        calculate(_estimate([line]))
+    assert exc.value.code == "LABOR_UNIT_MISMATCH"
+    assert exc.value.line_key == "L2"
 
 
 def test_override_reason_required():

@@ -75,7 +75,7 @@ def _validate_line(line: LineInput, seen_keys: set[str]) -> None:
         ok = True
         if group_count == 0 and line.price_override_cents is None:
             raise EstimateValidationError(
-                "LINE_TYPE_MISMATCH",
+                "ALLOWANCE_FEE_REQUIRES_OVERRIDE",
                 f"{line.line_type} line with no components requires price_override_cents",
                 line.line_key,
             )

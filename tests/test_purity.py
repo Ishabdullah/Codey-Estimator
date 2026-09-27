@@ -46,6 +46,7 @@ def test_no_float_literals_in_calc():
     targets = [
         SRC_ROOT / "money.py",
         SRC_ROOT / "units.py",
+        SRC_ROOT / "dto.py",
         *((SRC_ROOT / "calc").rglob("*.py")),
     ]
     for path in targets:
