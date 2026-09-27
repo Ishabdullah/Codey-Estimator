@@ -2,6 +2,88 @@
 
 Reverse-chronological. Every change gets an entry.
 
+## 2026-09-27 — Phase 4c: `codey_estimator.retailers` (RetailerAdapter interface, ManualAdapter, CsvImportAdapter)
+
+**What was done**
+- Full architect → implementer → code-reviewer → verifier pipeline, per
+  `CLAUDE.md`. Covers plan §9/§10's retailer abstraction, scoped to the two
+  sources that need no live network: manual entry and CSV/receipt import.
+  New package `src/codey_estimator/retailers/`:
+  - `base.py`: `RetailerAdapter` (a `@runtime_checkable Protocol`, matching
+    `ports.py`'s house style rather than plan §7's informal "ABC" wording),
+    `ObservedPrice` (an adapter's price output, before it has a DB id —
+    `.bind(id)` turns it into a real `PriceObservationData`, deliberately
+    never accepting a placeholder id like 0), `RetailerOffer` (product +
+    price together, since a search result without a price would be
+    useless), and `AdapterCapability` (an adapter declares what it can do;
+    "can't refresh" and "product not found" stay distinguishable, which
+    matters for the Phase 10 worker).
+  - `parsing.py`: price-text parsing (`parse_price_cents`), package-size
+    parsing from either separate qty/unit columns or one combined cell
+    (`parse_package_cells`/`parse_package_text`), and pure-integer
+    civil-calendar date arithmetic (`days_from_civil`, Hinnant's algorithm)
+    plus `parse_date` for ISO/US-format date cells.
+  - `manual.py`: `ManualAdapter.enter()` — turns a typed-in product into a
+    `RetailerOffer`, deriving a stable synthetic SKU from a hash of the
+    cleaned title + package qty/unit (case/whitespace/decimal-scale
+    insensitive) when the caller doesn't supply one. Free-typed package
+    sizes are allowed here specifically (`PackageSource.MANUAL_ENTRY`,
+    `retailer_linked=False`), per the existing Q8 rule.
+  - `csv_import.py`: `CsvImportAdapter.import_text()` — parses a retailer
+    purchase-history/receipt export with a configurable column mapping.
+    Row-level problems (bad price, bad date, conflicting package size for
+    an already-seen SKU, etc.) are collected and skipped, not fatal — a
+    bad line in a 500-row import doesn't kill the whole import. File-level
+    problems (missing/ambiguous mapped columns, no header, broken CSV
+    quoting) fail fast, since every row would be wrong. Duplicate rows
+    (same SKU/store/date/price) are recognized and skipped without
+    creating a redundant price observation. CSV-parsed package sizes get
+    `PackageSource.RETAILER_LISTING` provenance, since they describe a
+    real package the retailer actually sold.
+  - Three new error classes in `errors.py`: `RetailerAdapterError`,
+    `RetailerDataError`, `CsvImportError`.
+- User answered 3 questions the architect flagged as touching money/schema
+  (recorded in `docs/DECISIONS.md`'s Phase 4c addendum): CSV imports get
+  their own retailer code, always kept separate from a future live
+  price-checker for the same retailer (so a receipt's paid price and a
+  shelf-price check can never silently overwrite each other as "current");
+  CSV row prices are dated to the actual purchase date, not import time;
+  and confirmed real HD Pro Xtra/Lowe's exports carry a per-item price
+  column, so the line-total÷quantity derivation the architect flagged as
+  possibly-needed was dropped as unnecessary.
+- Code review: **APPROVED**, one trivial non-blocking finding (an orphaned
+  private helper function the implementer's own report said it had removed
+  but hadn't — `_raise_unsupported` in `base.py` was dead code, never
+  called; both adapters raise inline instead). Fixed directly by the
+  orchestrator (deleted the helper and its now-unused import) rather than
+  spinning up another implementer round for a one-line deletion.
+- Independently re-verified rather than trusting reported output: the
+  reviewer hand-recomputed the manual-entry SKU hash stability across
+  case/whitespace/decimal-scale variations, one of the CSV fixture's sha256
+  `raw_hash` values, the `DATE_AFTER_IMPORT` boundary date arithmetic, and
+  confirmed a malformed-CSV row-counting refactor (done to satisfy a ruff
+  lint rule) was genuinely behavior-neutral by running Python's
+  `csv.reader(strict=True)` directly against both fixture cases outside
+  the test suite.
+- Verifier: fresh run after the orchestrator's cleanup edit confirmed
+  **420 passed**, ruff clean, mypy clean (21 source files).
+
+**Areas of concern (carried forward, not blocking)**
+- Noted in `docs/DECISIONS.md`: a hand-edited CSV could in principle be
+  used to smuggle a free-typed package size in under `RETAILER_LISTING`
+  provenance, defeating the Q8 rule's intent. This library has no way to
+  detect that (a CSV file carries no signal about whether it was
+  hand-edited), and correctly doesn't try to. It's a process-control
+  question for whatever CSV-upload UI Codey-OS eventually builds (e.g.
+  requiring an unmodified retailer export, or flagging edited-looking
+  files for review) — logged for that later phase, not fixed here.
+- Deferred, not built: the HD/Lowe's live adapters themselves (D2's
+  accepted-risk scraper work, still Phase 11/12), wiring adapter output
+  through `catalog.normalize_product`/the matcher (Phase 4c's own explicit
+  "not this task" boundary), and cross-import deduplication across
+  separate CSV imports (a Codey-OS repository-layer concern, since it
+  needs to know what's already in the database).
+
 ## 2026-09-27 — Phase 4a: `codey_estimator.catalog` (product normalizer, canonical key, matcher, package inference)
 
 **What was done**
