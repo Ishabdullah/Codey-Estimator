@@ -2,6 +2,67 @@
 
 Reverse-chronological. Every change gets an entry.
 
+## 2026-09-27 — Phase 4b: `ports.py` (repository Protocols) + `refresh.py` (refresh policy, token bucket, daily budget, backoff, circuit breaker)
+
+**What was done**
+- Full architect → implementer → code-reviewer → verifier pipeline, per
+  `CLAUDE.md`. Spec covered plan §7/§12/§14.8: `RefreshPolicy` (interval
+  classification: normal/frequent/volatile/high-value/override, `is_due`,
+  `next_refresh_at`), `is_search_cache_fresh`, `TokenBucket`, `DailyBudget`,
+  `backoff_seconds`, `CircuitBreaker` (all in `refresh.py`), plus
+  `RetailerProductRepo`/`PriceObservationRepo`/`SearchCacheRepo` Protocols
+  and their record dataclasses (in `ports.py`). Two new error classes
+  (`PricingPolicyError`, `BudgetExceededError`) added to `errors.py`.
+- New files: `src/codey_estimator/{refresh,ports}.py`, `tests/conftest.py`
+  (a `FakeClock` fixture), `tests/test_{refresh_policy,token_bucket,
+  daily_budget,backoff_circuit,ports}.py`. `tests/test_purity.py` extended
+  (float-literal scan now covers these two new modules; forbidden-imports
+  list unchanged).
+- Resolved 9 architect open questions myself as orchestrator (recorded in
+  `docs/DECISIONS.md`'s Phase 4b addendum) — none required the user's
+  sign-off, since none set real tax/RBAC/schema policy, only implementation
+  technique within already-decided architecture (D1/D3, the Q8 package
+  provenance rule). One correction I made on review: renamed the
+  architect's `RefreshSubject.unit_price_cents` to `package_price_cents`
+  before implementation, since it collided in meaning with
+  `PriceObservationData.unit_price_cents` (a genuinely different,
+  computed per-unit-of-measure price) in the same spec.
+- Code review: **APPROVED**, no findings. Independently re-ran the test
+  suite/ruff/mypy rather than trusting the implementer's report; hand-
+  verified the trickiest worked examples (R7b's stored-`next_refresh_at`-
+  is-authoritative case, DailyBudget's backwards-clock-keeps-count case B5,
+  CircuitBreaker's late-result-while-OPEN case CB3) against the actual code.
+- Verifier: fresh run confirmed **129 passed**, `ruff check src tests` clean,
+  `mypy` clean (9 source files), matching both the implementer's and
+  reviewer's reported output exactly.
+
+**Key design points worth remembering**
+- `refresh.py` and `ports.py` read the wall clock only through a **required**
+  `now_fn` parameter — no default, no `datetime`/`time` import inside the
+  library (kept `test_purity.py`'s forbidden-imports list intact rather than
+  loosening it). `EpochSeconds = int` (UTC Unix seconds) throughout.
+- `retailer_code`/`store_code` are plain strings in the Protocols, never the
+  Core DB's integer ids — Codey-OS maps them at its own repository
+  implementation layer (D1 boundary).
+- `RetailerProductData` (an adapter's output) has no price or refresh
+  fields; only `PriceObservationRepo.append` can set the current price,
+  matching plan §8's append-only-observations rule.
+
+**Not done (by design, out of scope for this task)**
+- No SQLite implementations of the Protocols (Codey-OS, Phase 3).
+- No `pricing_jobs` queue or worker (Phase 10).
+- No product-level failure scheduling / `refresh_status='failed'` bookkeeping
+  (Codey-OS worker logic, Phase 10).
+- No `BudgetRepo` for persisting `DailyBudget` state across a restart —
+  `snapshot()`/`state=` exist for Codey-OS to persist later if it chooses.
+
+**Areas of concern (carried forward)**
+- `DailyBudget`'s fixed `utc_offset_seconds` drifts about an hour across
+  Connecticut's two annual DST transitions. Accepted as a soft-cap
+  limitation, not a defect — see `docs/DECISIONS.md` Phase 4b addendum, Q5.
+- The `CircuitBreaker` and `DailyBudget` are in-memory only; a Codey-OS
+  process restart resets both to their initial state. Accepted for now.
+
 ## 2026-09-27 — Add ruff + mypy (strict) to the library
 
 **What was done**
