@@ -49,9 +49,31 @@ def test_no_float_literals_in_calc():
         SRC_ROOT / "refresh.py",
         SRC_ROOT / "ports.py",
         *((SRC_ROOT / "calc").rglob("*.py")),
+        *((SRC_ROOT / "catalog").rglob("*.py")),
     ]
     for path in targets:
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and isinstance(node.value, float):
                 raise AssertionError(f"{path} contains a float literal: {node.value}")
+
+
+CATALOG_IMPORT_ALLOWLIST = {
+    "re",
+    "fractions",
+    "decimal",
+    "dataclasses",
+    "enum",
+    "typing",
+    "collections",
+    "math",
+    "codey_estimator",
+}
+
+
+def test_catalog_import_allowlist():
+    for path in (SRC_ROOT / "catalog").rglob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        imported = _imported_module_names(tree)
+        disallowed = imported - CATALOG_IMPORT_ALLOWLIST
+        assert not disallowed, f"{path} imports outside the catalog allow-list: {disallowed}"

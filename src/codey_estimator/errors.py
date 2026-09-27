@@ -30,6 +30,17 @@ class PricingPolicyError(EstimatorError, ValueError):
         self.code = code
 
 
+class UnknownCategoryError(EstimatorError, ValueError):
+    pass
+
+
+class CatalogValidationError(EstimatorError, ValueError):
+    def __init__(self, code: str, message: str, attr: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.attr = attr
+
+
 class BudgetExceededError(EstimatorError):
     def __init__(self, cap: int, used: int, requested: int) -> None:
         super().__init__(

@@ -2,6 +2,74 @@
 
 Reverse-chronological. Every change gets an entry.
 
+## 2026-09-27 — Phase 4a: `codey_estimator.catalog` (product normalizer, canonical key, matcher, package inference)
+
+**What was done**
+- Full architect → implementer → code-reviewer → verifier pipeline, per
+  `CLAUDE.md`. Covers plan §11 (product normalization/matching) and the Q8
+  package-provenance rule. New package `src/codey_estimator/catalog/`:
+  - `schema.py`: five category schemas (plumbing pipe, drywall sheet,
+    lumber, fastener, paint), each attribute typed TEXT/MEASURE/COUNT and
+    scored REQUIRED/OPTIONAL/INFO; `NormalizedAttributes` + `make_attributes`
+    (canonicalizes and validates, e.g. unit conversion via `units.py`).
+  - `text.py`: text preprocessing (fraction/unit/mark normalization),
+    fraction parsing, measure extraction, a priority-ordered vocabulary
+    table per category (materials, subtypes, colors, gauges, finishes...).
+  - `normalizer.py`: `normalize_product(text, category, brand=...)` — turns
+    a raw retailer title into `NormalizedAttributes`, with per-category
+    extraction logic (e.g. drywall's width×length pair regex, lumber's
+    triple-dimension parser with an inches-vs-feet heuristic).
+  - `keys.py`: `canonical_key()` — the "same material across retailers" ID,
+    e.g. `plumbing_pipe:PEX|PEX-B|0.5in|red|50ft|pipe`.
+  - `matcher.py`: `match()` — scores a candidate product against a canonical
+    material as integer basis points (0–10000), classifying
+    AUTO_CONFIRMED/PROPOSED/NO_MATCH; handles UPC/model-number identity,
+    required-attribute conflicts, and a subtype-mismatch confidence cap.
+  - `package.py`: `infer_package()`/`validate_package()` — derives a
+    package quantity/unit from parsed attributes (e.g. drywall's SF from
+    width×length), enforcing the Q8 rule that a real retailer-linked
+    product can never carry a manually-typed package size.
+  - Two new error classes in `errors.py`: `UnknownCategoryError`,
+    `CatalogValidationError`.
+- User answered 4 schema/matching-policy questions the architect explicitly
+  flagged as needing sign-off (recorded in `docs/DECISIONS.md`'s Phase 4a
+  addendum): UPC/model identity with a conflicting attribute flags for
+  human review rather than auto-merging or discarding; unspecified
+  subtypes default to plain/standard (drywall REGULAR, lumber UNTREATED);
+  the matcher's weights/thresholds (90%/60% confidence bands); and the
+  canonical key format itself (shown with real worked examples before
+  approval, since it corrected a real gap in the architecture plan's own
+  illustrative example — the plan's example key would have let ½" PEX-A
+  and PEX-B collide as the same material).
+- Code review: **APPROVED**. Independently re-ran the suite and hand/
+  script-recomputed the trickiest basis-point arithmetic (the subtype-
+  mismatch confidence cap, the UPC-identity-with-conflict cases, several
+  non-terminating-fraction canonical keys) rather than trusting either the
+  spec's or the implementer's stated numbers.
+- Verifier: fresh run confirmed **314 passed**, ruff clean, mypy clean —
+  matching both prior reports exactly.
+
+**Areas of concern (carried forward, not blocking)**
+- The code reviewer flagged one non-blocking structural note: `text.py`'s
+  `find_measures` imports `Measure` from `schema.py` inside the function
+  body (not at module top) to break a real circular import
+  (`schema.py` imports from `text.py` at module scope). It works correctly
+  and passes the import-allowlist test for a legitimate reason, but the
+  reviewer noted a cleaner structure exists — pulling `Measure` into its
+  own leaf module both `schema.py` and `text.py` import from, removing the
+  cycle outright. Logged here as a follow-up cleanup, not fixed now, since
+  the reviewer classified it as a taste/architecture call, not a
+  correctness or constraint violation.
+- Two documented normalizer limitations carried from the spec (not new):
+  lumber length with no explicit unit uses a `<=24in -> feet, else inches`
+  heuristic that can misread an unusual precut length; product dimensions
+  written only in inches (e.g. "48 in. x 96 in." drywall) aren't parsed —
+  only the "4 ft x 8 ft" style is. Both are v1 gaps, not defects.
+- Deferred, not built: the ~100-real-title normalizer test corpus from plan
+  §26 (needs real retailer listings, not invented ones), a "fittings"
+  category, and the "a rejected match is never re-proposed" rule (that's
+  service/DB state, Phase 13 in Codey-OS).
+
 ## 2026-09-27 — Phase 4b: `ports.py` (repository Protocols) + `refresh.py` (refresh policy, token bucket, daily budget, backoff, circuit breaker)
 
 **What was done**
