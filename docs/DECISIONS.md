@@ -205,11 +205,17 @@ than being decided by the orchestrator. Answered 2026-09-27:
   defaults. Revisit with real cross-retailer listing data once Phase 4a/13
   actually runs against retailer products, not before.
 - **Canonical key format** (adds a category prefix and includes `SUBTYPE`,
-  vs. the architecture plan's own illustrative example): **pending — the
-  user asked to see the exact format with real examples before approving.**
-  Given directly in the same conversation turn as this addendum (see
-  `PROJECT_LOG.md`/chat for the worked table). Do not implement `keys.py`
-  until this line is updated to "approved."
+  vs. the architecture plan's own illustrative example): **approved
+  2026-09-27**, after the user reviewed the exact format with worked
+  examples. Format: `{category}:{segment}|{segment}|...` over
+  `schema.key_attrs` in fixed schema order, `*` for an absent optional
+  attribute, INFO attrs (brand, package_count) never included. Examples:
+  `plumbing_pipe:PEX|PEX-B|0.5in|red|50ft|pipe`,
+  `plumbing_pipe:PEX|*|0.5in|*|50ft|pipe` (no subtype known),
+  `drywall_sheet:REGULAR|0.5in|4ft|8ft`, `lumber:2x4|8ft|UNTREATED|*`,
+  `fastener:screw|DRYWALL|#8|1.625in|*`,
+  `paint:paint|INTERIOR|eggshell|1gal|white`. `keys.py` may now be
+  implemented as specified.
 - **Package-inference provenance (Q6):** approved as scoped — `infer_package`
   itself assigns no provenance; whether a package size counts as
   `RETAILER_LISTING` or `MANUAL_ENTRY` is decided by the adapter/caller, per
