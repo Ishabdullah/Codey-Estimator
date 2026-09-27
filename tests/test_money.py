@@ -1,5 +1,4 @@
 from decimal import Decimal
-from fractions import Fraction
 
 import pytest
 

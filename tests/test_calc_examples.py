@@ -2,9 +2,9 @@ from decimal import Decimal
 
 from codey_estimator.calc import CALC_ENGINE_VERSION, calculate
 from codey_estimator.dto import (
+    DiscountKind,
     EstimateDiscount,
     EstimateInput,
-    DiscountKind,
     LaborInput,
     LaborRateType,
     LineInput,

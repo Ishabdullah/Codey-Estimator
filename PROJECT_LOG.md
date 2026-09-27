@@ -2,6 +2,56 @@
 
 Reverse-chronological. Every change gets an entry.
 
+## 2026-09-27 — Add ruff + mypy (strict) to the library
+
+**What was done**
+- Added `[project.optional-dependencies].lint` (`ruff>=0.6`, `mypy>=1.10`) to
+  `pyproject.toml`, plus `[tool.ruff]` (line-length 100, `E/F/I/UP/B/SIM` rules,
+  first-party import grouping) and `[tool.mypy]` (`strict = true`, scoped to
+  `src/codey_estimator`; `tests/*` exempted from strict mode since tests are
+  allowed looser typing than the library itself, per this repo's own
+  stdlib-only/strict rule applying to `src/`, not to test code).
+- Added a `lint` job to `.github/workflows/test.yml`, parallel to the existing
+  `pytest` job: `ruff check src tests` then `mypy`.
+- Fixed every finding both tools raised against the existing Phase 2 code —
+  no findings were suppressed or ignored:
+  - `src/codey_estimator/calc/engine.py`, `dto.py`: three lines over the
+    100-column limit, wrapped (no logic change).
+  - `src/codey_estimator/money.py`, `units.py`: three `isinstance(x, A) or
+    isinstance(x, B)` chains merged into `isinstance(x, (A, B))` — same
+    semantics, ruff's SIM101.
+  - `tests/test_purity.py`: a nested `if` merged into one `and`-joined
+    condition (SIM102) — same semantics.
+  - `tests/*`: unused imports removed, import blocks re-sorted (ruff
+    `--fix`, both purely cosmetic).
+  - `mypy --strict` findings, all in `calc/engine.py`: added a `_LineRaw`
+    TypedDict (replacing two bare `dict` annotations) so the internal raw
+    line-computation shape is fully typed instead of untyped, and rewrote
+    the `sell_before_discount` ternary to test `line.price_override_cents
+    is not None` directly (instead of through an intermediate bool) so
+    mypy can narrow `int | None` to `int` across the branch. No calculation
+    logic changed — verified by re-running the full suite.
+- Ran the full test suite after every fix: **64 passed**, unchanged from
+  before this task. `ruff check src tests` and `mypy` are both clean.
+
+**Areas of concern**
+- **Termux caveat (confirmed via web search, not assumed):** `pip install
+  ruff` fails on Termux/Android — no compatible wheel, and building from
+  source fails too (missing `-lgcc` linking; see
+  [astral-sh/ruff#17527](https://github.com/astral-sh/ruff/issues/17527) and
+  [astral-sh/ruff#4436](https://github.com/charliermarsh/ruff/issues/4436)).
+  **On the phone, install ruff with `pkg install ruff`** (Termux ships a
+  prebuilt binary package), not `pip install -e ".[lint]"`. `mypy` has no
+  such problem — it's pure Python and installs fine via pip anywhere,
+  including Termux. This only affects local dev linting on-device; it does
+  not affect running the library or its tests, and CI (GitHub Actions,
+  ubuntu-latest) is unaffected since it installs via pip on glibc Linux.
+
+**Not done**
+- No pre-commit hook was added (not asked for). Lint runs in CI and on
+  demand (`ruff check src tests && mypy`), not automatically on every local
+  commit.
+
 ## 2026-09-27 — Phase 2: codey_estimator library foundation, built through the pipeline
 
 **What was done**

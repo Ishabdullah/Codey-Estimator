@@ -1,9 +1,10 @@
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 from fractions import Fraction
-from typing import Final, Mapping
+from typing import Final
 
 from codey_estimator.errors import IncompatibleUnitsError, UnknownUnitError
 
@@ -100,7 +101,7 @@ def get_unit(code: str) -> Unit:
 def convert_quantity(
     qty: Decimal | int | Fraction, from_unit: str, to_unit: str
 ) -> Fraction:
-    if isinstance(qty, bool) or isinstance(qty, float):
+    if isinstance(qty, (bool, float)):
         raise TypeError("convert_quantity does not accept bool or float")
     from_u = get_unit(from_unit)
     to_u = get_unit(to_unit)
@@ -120,7 +121,7 @@ def packages_needed(
     package_qty: Decimal | int,
     package_unit: str,
 ) -> int:
-    if isinstance(package_qty, bool) or isinstance(package_qty, float):
+    if isinstance(package_qty, (bool, float)):
         raise TypeError("packages_needed does not accept bool or float for package_qty")
     if package_qty <= 0:
         raise ValueError("packages_needed requires a positive package_qty")

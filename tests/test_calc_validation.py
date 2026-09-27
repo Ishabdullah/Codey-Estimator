@@ -1,4 +1,3 @@
-import copy
 from decimal import Decimal
 
 import pytest
@@ -9,7 +8,6 @@ from codey_estimator.dto import (
     DiscountKind,
     EstimateDiscount,
     EstimateInput,
-    EquipmentInput,
     LaborInput,
     LaborRateType,
     LineInput,

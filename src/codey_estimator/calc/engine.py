@@ -1,6 +1,6 @@
 from decimal import Decimal, localcontext
 from fractions import Fraction
-from typing import Final
+from typing import Final, TypedDict
 
 from codey_estimator.dto import (
     DiscountKind,
@@ -17,10 +17,37 @@ from codey_estimator.errors import (
     IncompatibleUnitsError,
     UnknownUnitError,
 )
-from codey_estimator.money import allocate_pro_rata, apply_markup, percent_of, ratio_bp, round_half_up
+from codey_estimator.money import (
+    allocate_pro_rata,
+    apply_markup,
+    percent_of,
+    ratio_bp,
+    round_half_up,
+)
 from codey_estimator.units import convert_quantity, normalize_unit, packages_needed
 
 CALC_ENGINE_VERSION: Final[int] = 1
+
+
+class _LineRaw(TypedDict):
+    """Internal shape returned by `_compute_line`, before it's spread into a
+    `LineResult`. Not part of the public API."""
+
+    qty_with_waste: Decimal | None
+    packages_needed: int | None
+    material_cost_cents: int
+    material_sell_cents: int
+    labor_cost_cents: int
+    labor_sell_cents: int
+    equipment_cost_cents: int
+    equipment_sell_cents: int
+    sub_cost_cents: int
+    sub_sell_cents: int
+    cost_total_cents: int
+    components_sell_cents: int
+    sell_before_discount_cents: int
+    price_override_applied: bool
+    sell_total_cents: int
 
 
 def _require_money(value: object, field_name: str, line_key: str | None) -> None:
@@ -201,7 +228,7 @@ def _validate_line(line: LineInput, seen_keys: set[str]) -> None:
             )
 
 
-def _compute_line(line: LineInput) -> dict:
+def _compute_line(line: LineInput) -> _LineRaw:
     qty_with_waste: Decimal | None = None
     packages: int | None = None
     material_cost = material_sell = 0
@@ -218,7 +245,9 @@ def _compute_line(line: LineInput) -> dict:
     labor_cost = labor_sell = 0
     if line.labor is not None:
         lb = line.labor
-        eff_qty = Fraction(1) if lb.rate_type == LaborRateType.FIXED_FLAT else Fraction(lb.labor_qty)
+        eff_qty = (
+            Fraction(1) if lb.rate_type == LaborRateType.FIXED_FLAT else Fraction(lb.labor_qty)
+        )
         labor_cost = round_half_up(eff_qty * lb.labor_cost_rate_cents)
         labor_sell = round_half_up(eff_qty * lb.labor_bill_rate_cents)
 
@@ -238,7 +267,9 @@ def _compute_line(line: LineInput) -> dict:
     components_sell = material_sell + labor_sell + equipment_sell + sub_sell
     price_override_applied = line.price_override_cents is not None
     sell_before_discount = (
-        line.price_override_cents if price_override_applied else components_sell
+        line.price_override_cents
+        if line.price_override_cents is not None
+        else components_sell
     )
     sell_total = sell_before_discount - line.line_discount_cents
     if sell_total < 0:
@@ -322,7 +353,7 @@ def calculate(estimate: EstimateInput) -> EstimateResult:
                 )
 
     seen_keys: set[str] = set()
-    raws: list[dict] = []
+    raws: list[_LineRaw] = []
     for line in estimate.lines:
         _validate_line(line, seen_keys)
         raws.append(_compute_line(line))

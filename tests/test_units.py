@@ -44,8 +44,8 @@ def test_packages_needed():
 
 
 def test_float_trap():
-    from codey_estimator.dto import LineInput, LineType, MaterialInput
     from codey_estimator.calc.engine import calculate_line
+    from codey_estimator.dto import LineInput, LineType, MaterialInput
 
     line = LineInput(
         line_key="float-trap",

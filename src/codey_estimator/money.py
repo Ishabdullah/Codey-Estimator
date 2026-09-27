@@ -1,8 +1,9 @@
 import math
 import re
+from collections.abc import Sequence
 from decimal import Decimal
 from fractions import Fraction
-from typing import Final, Sequence, TypeAlias
+from typing import Final, TypeAlias
 
 Cents: TypeAlias = int
 BP_DENOMINATOR: Final[int] = 10_000
@@ -20,9 +21,7 @@ def round_half_up(value: Fraction | Decimal | int) -> int:
         raise TypeError("round_half_up does not accept bool")
     if isinstance(value, float):
         raise TypeError("round_half_up does not accept float")
-    if isinstance(value, int):
-        frac = Fraction(value)
-    elif isinstance(value, Decimal):
+    if isinstance(value, (int, Decimal)):
         frac = Fraction(value)
     elif isinstance(value, Fraction):
         frac = value

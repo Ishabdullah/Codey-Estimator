@@ -202,7 +202,15 @@ class CustomerEstimateView:
 
 
 CUSTOMER_VIEW_KEYS: Final[frozenset[str]] = frozenset(
-    {"lines", "subtotal_cents", "discount_cents", "tax_cents", "total_cents", "terms", "customer_notes"}
+    {
+        "lines",
+        "subtotal_cents",
+        "discount_cents",
+        "tax_cents",
+        "total_cents",
+        "terms",
+        "customer_notes",
+    }
 )
 CUSTOMER_LINE_KEYS: Final[frozenset[str]] = frozenset(
     {"description", "quantity", "unit", "price_cents"}

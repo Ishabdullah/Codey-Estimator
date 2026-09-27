@@ -11,9 +11,32 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
+lint = ["ruff>=0.6", "mypy>=1.10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["codey_estimator"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+files = ["src/codey_estimator"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
